@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script>
+
+$(document).ready(function(){
+
+
+//definicia pre tlacitko stav dropletov
+$("#ziskajdroplet").click(function(){
+cistenie();
+getRequest();
+});
+
+//definicia pre tlacitko vymaz droplet
+$("#vymazdroplet").click(function(){
+cistenie();
+deleteRequest();
+});
+
+//definicia pre tlacitko zapni droplet
+$("#zapnidroplet").click(function(){
+cistenie();
+startRequest();
+});
+
+// definicia funkcie na GET request dropletu    
+  function getRequest() {
+  return fetch('https://api.digitalocean.com/v2/droplets?page=1&per_page=1', {
+    credentials: 'omit', // 'include', default: 'omit'
+    method: 'GET', // 'GET', 'PUT', 'DELETE', etc.
+    headers: new Headers({
+      'Content-Type': 'application/json',
+	  'Authorization': 'Bearer 06bda1ec8541934d085c5cc5fd58f606f5062b63f58be2ee69f890fe24afec35'
+    }),
+	mode: "cors",
+  }) // koniec fetchovania
+  .then(response => response.json())
+  .then(function(id_dropletu) {
+
+  	  if(!id_dropletu.droplets.hasOwnProperty('0')){
+		document.getElementById("dropletid").innerHTML = "Neexistuje ziadne id dropletu.";
+		return false;  //ukoncenie celeho procesingu funkcie getRequest()
+		} 
+
+document.getElementById("dropletid").innerHTML = "id dropletu je " + id_dropletu.droplets[0].id;
+document.getElementById("postodpoved1").innerHTML = "created_at je  " + id_dropletu.droplets[0].created_at;
+document.getElementById("postodpoved2").innerHTML = "cena za mesiac " + id_dropletu.droplets[0].size.price_monthly + " eur";
+document.getElementById("postodpoved3").innerHTML = "ip " + id_dropletu.droplets[0].networks.v4[0].ip_address;
+document.getElementById("postodpoved4").innerHTML = "https://" + id_dropletu.droplets[0].networks.v4[0].ip_address + "/media/novyklient.ovpn";
+document.getElementById("postodpoved4").href = "https://" + id_dropletu.droplets[0].networks.v4[0].ip_address + "/media/novyklient.ovpn";
+
+return id_dropletu.droplets[0].id;   // funkcia vrati promise id-cka dropletu pre dalsie funkcie(stale som v .then!), zaroven sa funkcia get ukonci.   
+							})		//koniec then promisu
+   .catch(error => alert("tlacitko get error " + error))
+};		//koniec definicie funkcie get request
+
+
+
+// definicia funkcie DELETE request dropletu    
+function deleteRequest() {
+getRequest() // potrebujem id dropletu aby som vedel co idem vymazavat
+// kedze get requets nevracia hodnotu ale iba promise, musim pouzit dalsi .then
+.then(function(idckoDropletu) {
+var actionurl = "https://api.digitalocean.com/v2/droplets/" + idckoDropletu;
+
+if ( !idckoDropletu ){
+return false //ak get funkcia vratila false, znamena to ze neexistuje idcko dropletu a funkcia delete sa ukonci.
+}
+
+document.getElementById("postodpoved3").innerHTML = "Teraz vymazem droplet id " + idckoDropletu;
+
+fetch(actionurl, {
+			credentials: 'omit', // 'include', default: 'omit'
+			method: 'DELETE', // 'GET', 'PUT', 'DELETE', etc.
+			headers: new Headers({
+			'Content-Type': 'application/json',
+			'Authorization': 'Bearer 06bda1ec8541934d085c5cc5fd58f606f5062b63f58be2ee69f890fe24afec35'
+			}),
+			mode: "cors",
+		}) //koniec return fetch funkcie
+}) // koniec .then po zavolani get funkcie
+} // koniec definicie deleteRequest funkcie
+
+
+// definicia funkcie ZAPNI droplet
+function startRequest() {
+getRequest() // zistujem ci uz bezi nejaky droplet, ak ano, funkcia sa ukonci
+// kedze get requets nevracia hodnotu ale iba promise, musim pouzit dalsi .then
+.then(function(idckoDropletu) {
+
+	if ( idckoDropletu ){
+	document.getElementById("postodpoved3").innerHTML = "Jeden droplet s id-ckom " + idckoDropletu + " uz bezi, takze nebudem spustat dalsi";
+	return false //ak get funkcia vratila true, znamena to ze existuje idcko dropletu takze nebudem spustat dalsi a funkcia sa ukonci.
+}
+
+
+//som stale v .then, znamena to ze neexistuje ziadne id dropletu a mozem zacat jeden vytvarat
+document.getElementById("postodpoved1").innerHTML = "Teraz idem nastartovat novy droplet zo zalohy";
+
+// spustam fetch na vytvorenie dropletu	
+	var url = 'https://api.digitalocean.com/v2/droplets/';
+	var data = {"name":"zApiVytiahnutyKokot","region":"fra1","size":"s-1vcpu-1gb","image":"41423132","ssh_keys":[23683586],"backups":false,"ipv6":false,"user_data":"#!/bin/bash\n~/vpnpusher.sh","private_networking":null,"volumes": null,"tags":["vpnServer"]}
+
+fetch(url, {
+	credentials: 'omit', // 'include', default: 'omit'
+	method: 'POST', // 'GET', 'PUT', 'DELETE', etc.
+	headers: new Headers({
+	'Content-Type': 'application/json',
+	'Authorization': 'Bearer 06bda1ec8541934d085c5cc5fd58f606f5062b63f58be2ee69f890fe24afec35'
+	}),
+	mode: "cors",
+	body: JSON.stringify(data),  //cez http sa neprenasaju objekty ak chapem dobre
+	}) // uzavrety fetch
+
+	.then(response => response.json())
+	.then(function(vysledok) {
+
+document.getElementById("postodpoved2").innerHTML = "droplet " + vysledok.droplet.id + " vytvoreny " + vysledok.droplet.created_at;
+document.getElementById("postodpoved3").innerHTML = "cena noveho dropletu je " + vysledok.droplet.size.price_monthly + " eur mesacne";
+
+	console.log(JSON.stringify(vysledok));
+	  })
+	.catch(error => alert("chyba restoru" + JSON.stringify(error)))
+	
+}) // koniec .then pre get request v ktorom sa odohrava aj vytvaranie dropletu... co je dost neprehladne
+} // koniec definicie funkcie ZAPNI droplet
+
+
+// zaciatok definicie cistenie tagov 
+function cistenie() {
+document.getElementById("dropletid").innerHTML = "";
+document.getElementById("postodpoved1").innerHTML = "";
+document.getElementById("postodpoved2").innerHTML = "";
+document.getElementById("postodpoved3").innerHTML = "";
+document.getElementById("postodpoved4").innerHTML = "";
+document.getElementById("postodpoved4").href = "";
+}// koniec definicie cistenie tagov 
+
+
+});  //ukoncenie document ready funkcie
+
+
+</script>
+</head>
+<body>
+<button id="ziskajdroplet">stav dropletov</button>
+<button id="vymazdroplet">vymazat droplet</button>
+<button id="zapnidroplet">zapnut droplet</button>
+<p id="dropletid"></p>
+<p id="postodpoved1"></p>
+<p id="postodpoved2"></p>
+<p id="postodpoved3"></p>
+<a id="postodpoved4" href=""></a>
+</body>
+</html>
